@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">FindAnything</string>
+    <string name="tagline">Just ask. Your phone finds it.</string>
+    <string name="ask_your_phone">Ask your phone</string>
+    <string name="search_hint">Search anything on your phone…</string>
+    <string name="voice_search">Voice</string>
+    <string name="upload_reference">Upload</string>
+    <string name="camera_search">Camera</string>
+</resources>

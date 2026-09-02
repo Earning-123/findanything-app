@@ -1,0 +1,6 @@
+{
+  "name": "FindAnything",
+  "description": "Universal AI phone search and action assistant to find photos, files, documents, and apps using text, voice, reference uploads, and camera.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -4,13 +4,16 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.LabelEntity
 import com.example.data.local.SearchHistoryEntity
 import com.example.data.repository.SearchRepository
 import com.example.engine.ActionEngine
 import com.example.engine.VoiceEngine
 import com.example.engine.VoiceState
 import com.example.model.DuplicateCluster
+import com.example.model.IndexDiagnostics
 import com.example.model.ItemType
+import com.example.model.LabelWithDetails
 import com.example.model.ParsedIntent
 import com.example.model.SearchItem
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,8 +53,23 @@ class SearchViewModel(
     val recentSearches: StateFlow<List<SearchHistoryEntity>> = repository.recentSearches
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allLabels: StateFlow<List<LabelEntity>> = repository.allLabels
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _activeLabelDetails = MutableStateFlow<LabelWithDetails?>(null)
+    val activeLabelDetails: StateFlow<LabelWithDetails?> = _activeLabelDetails.asStateFlow()
+
+    private val _diagnostics = MutableStateFlow(IndexDiagnostics())
+    val diagnostics: StateFlow<IndexDiagnostics> = _diagnostics.asStateFlow()
+
     val voiceState: StateFlow<VoiceState> = voiceEngine.voiceState
     val soundLevel: StateFlow<Float> = voiceEngine.soundLevel
+
+    init {
+        // Kick off incremental background indexing on startup
+        triggerIncrementalIndex()
+        loadDiagnostics()
+    }
 
     fun onQueryChange(newQuery: String) {
         _uiState.value = _uiState.value.copy(query = newQuery, errorMessage = null)
@@ -130,6 +148,21 @@ class SearchViewModel(
                     isSearching = false,
                     errorMessage = "Failed to process reference: ${e.localizedMessage}"
                 )
+            }
+        }
+    }
+
+    fun rememberAsReference(labelName: String, uri: Uri) {
+        if (labelName.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val label = repository.createOrGetLabel(labelName.trim())
+                repository.addReferenceImageToLabel(label.id, uri)
+                _uiState.value = _uiState.value.copy(statusMessage = "Saved as reference for '${label.name}'")
+                // Trigger visual search for this label
+                searchWithReferenceImage(uri)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Could not save reference: ${e.localizedMessage}")
             }
         }
     }
@@ -241,11 +274,21 @@ class SearchViewModel(
     fun clearIndexAndCache() {
         viewModelScope.launch {
             repository.clearIndexAndCache()
+            loadDiagnostics()
             _uiState.value = _uiState.value.copy(
                 rawResults = emptyList(),
                 hasSearched = false,
                 statusMessage = "Local index & OCR cache cleared."
             )
+        }
+    }
+
+    fun clearAllRememberedData() {
+        viewModelScope.launch {
+            repository.clearAllRememberedData()
+            _activeLabelDetails.value = null
+            loadDiagnostics()
+            _uiState.value = _uiState.value.copy(statusMessage = "All remembered entities and references deleted.")
         }
     }
 
@@ -259,6 +302,120 @@ class SearchViewModel(
             referenceOcrText = null,
             activeFilter = null
         )
+    }
+
+    // ----------------------------------------------------
+    // People & Labels Management Methods
+    // ----------------------------------------------------
+    fun loadLabelDetails(labelId: Long) {
+        viewModelScope.launch {
+            val details = repository.getLabelWithDetails(labelId)
+            _activeLabelDetails.value = details
+        }
+    }
+
+    fun clearActiveLabelDetails() {
+        _activeLabelDetails.value = null
+    }
+
+    fun createLabel(name: String, notes: String = "") {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val created = repository.createOrGetLabel(name, notes)
+            loadLabelDetails(created.id)
+            loadDiagnostics()
+        }
+    }
+
+    fun addReferenceToLabel(labelId: Long, uri: Uri) {
+        viewModelScope.launch {
+            repository.addReferenceImageToLabel(labelId, uri)
+            loadLabelDetails(labelId)
+            loadDiagnostics()
+        }
+    }
+
+    fun removeReference(referenceId: Long, labelId: Long) {
+        viewModelScope.launch {
+            repository.removeReferenceImage(referenceId)
+            loadLabelDetails(labelId)
+            loadDiagnostics()
+        }
+    }
+
+    fun renameLabel(labelId: Long, newName: String) {
+        if (newName.isBlank()) return
+        viewModelScope.launch {
+            repository.renameLabel(labelId, newName)
+            loadLabelDetails(labelId)
+        }
+    }
+
+    fun deleteLabel(labelId: Long) {
+        viewModelScope.launch {
+            repository.deleteLabel(labelId)
+            _activeLabelDetails.value = null
+            loadDiagnostics()
+        }
+    }
+
+    fun mergeLabels(sourceId: Long, targetId: Long) {
+        viewModelScope.launch {
+            repository.mergeLabels(sourceId, targetId)
+            loadLabelDetails(targetId)
+            loadDiagnostics()
+        }
+    }
+
+    fun confirmMatch(labelId: Long, mediaId: String) {
+        viewModelScope.launch {
+            repository.confirmMatch(labelId, mediaId)
+            // Update rawResults in active search if present
+            val updated = _uiState.value.rawResults.map {
+                if (it.id == mediaId) it.copy(labelBadge = "Confirmed Match", isConfirmed = true, isPossibleMatch = false)
+                else it
+            }
+            _uiState.value = _uiState.value.copy(rawResults = updated)
+            loadLabelDetails(labelId)
+        }
+    }
+
+    fun rejectMatch(labelId: Long, mediaId: String) {
+        viewModelScope.launch {
+            repository.rejectMatch(labelId, mediaId)
+            // Remove from rawResults if rejecting
+            val updated = _uiState.value.rawResults.filter { it.id != mediaId }
+            _uiState.value = _uiState.value.copy(rawResults = updated)
+            loadLabelDetails(labelId)
+        }
+    }
+
+    // ----------------------------------------------------
+    // Diagnostics & Indexing Operations
+    // ----------------------------------------------------
+    fun loadDiagnostics() {
+        viewModelScope.launch {
+            val diag = repository.getDiagnostics()
+            _diagnostics.value = diag
+        }
+    }
+
+    fun triggerIncrementalIndex() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(statusMessage = "Indexing phone content...")
+            repository.indexDeviceContent(forceRebuild = false)
+            loadDiagnostics()
+            _uiState.value = _uiState.value.copy(statusMessage = null)
+        }
+    }
+
+    fun triggerRebuildIndex() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(statusMessage = "Rebuilding local index from scratch...")
+            repository.indexDeviceContent(forceRebuild = true)
+            loadDiagnostics()
+            _uiState.value = _uiState.value.copy(statusMessage = "Index rebuilt successfully!")
+        }
     }
 }
 
@@ -275,3 +432,4 @@ class SearchViewModelFactory(
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
+

@@ -48,7 +48,9 @@ import androidx.navigation.compose.rememberNavController
 import com.example.engine.VoiceState
 import com.example.ui.components.VoiceSearchDialog
 import com.example.ui.screens.CameraSearchScreen
+import com.example.ui.screens.DiagnosticsScreen
 import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.PeopleAndLabelsScreen
 import com.example.ui.screens.PermissionsScreen
 import com.example.ui.screens.PrivacyCenterScreen
 import com.example.ui.screens.ResultsScreen
@@ -88,6 +90,9 @@ fun FindAnythingMainApp(viewModel: SearchViewModel) {
 
     val uiState by viewModel.uiState.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
+    val allLabels by viewModel.allLabels.collectAsState()
+    val activeLabelDetails by viewModel.activeLabelDetails.collectAsState()
+    val diagnostics by viewModel.diagnostics.collectAsState()
     val voiceState by viewModel.voiceState.collectAsState()
     val soundLevel by viewModel.soundLevel.collectAsState()
 
@@ -223,6 +228,8 @@ fun FindAnythingMainApp(viewModel: SearchViewModel) {
                         onUploadClick = { navController.navigate("upload") },
                         onCameraClick = { navController.navigate("camera") },
                         recentSearches = recentSearches,
+                        labels = allLabels,
+                        onPeopleClick = { navController.navigate("people") },
                         onRecentClick = { q ->
                             viewModel.executeSearch(q)
                             navController.navigate("results")
@@ -249,7 +256,59 @@ fun FindAnythingMainApp(viewModel: SearchViewModel) {
                         onBackClick = { navController.popBackStack() },
                         onOpenItem = { item -> viewModel.openItem(item) },
                         onShareItem = { item -> viewModel.shareItem(item) },
-                        onDeleteItem = { item -> viewModel.requestDeleteItem(item) }
+                        onDeleteItem = { item -> viewModel.requestDeleteItem(item) },
+                        onConfirmMatch = { mediaId ->
+                            val targetPerson = uiState.parsedIntent?.targetPerson
+                            val targetLabel = if (targetPerson != null) {
+                                allLabels.find { it.name.equals(targetPerson, ignoreCase = true) }
+                            } else null
+                            if (targetLabel != null) {
+                                viewModel.confirmMatch(targetLabel.id, mediaId)
+                            }
+                        },
+                        onRejectMatch = { mediaId ->
+                            val targetPerson = uiState.parsedIntent?.targetPerson
+                            val targetLabel = if (targetPerson != null) {
+                                allLabels.find { it.name.equals(targetPerson, ignoreCase = true) }
+                            } else null
+                            if (targetLabel != null) {
+                                viewModel.rejectMatch(targetLabel.id, mediaId)
+                            }
+                        }
+                    )
+                }
+
+                // People & Remembered Entities Screen
+                composable("people") {
+                    PeopleAndLabelsScreen(
+                        labels = allLabels,
+                        activeLabelDetails = activeLabelDetails,
+                        onSelectLabel = { id ->
+                            if (id < 0) viewModel.clearActiveLabelDetails()
+                            else viewModel.loadLabelDetails(id)
+                        },
+                        onCreateLabel = { name, notes -> viewModel.createLabel(name, notes) },
+                        onAddReference = { labelId, uri -> viewModel.addReferenceToLabel(labelId, uri) },
+                        onRemoveReference = { refId, labelId -> viewModel.removeReference(refId, labelId) },
+                        onRenameLabel = { labelId, newName -> viewModel.renameLabel(labelId, newName) },
+                        onDeleteLabel = { labelId -> viewModel.deleteLabel(labelId) },
+                        onMergeLabels = { sourceId, targetId -> viewModel.mergeLabels(sourceId, targetId) },
+                        onConfirmMatch = { labelId, mediaId -> viewModel.confirmMatch(labelId, mediaId) },
+                        onRejectMatch = { labelId, mediaId -> viewModel.rejectMatch(labelId, mediaId) },
+                        onBackClick = { navController.popBackStack() },
+                        onOpenMedia = { item -> viewModel.openItem(item) }
+                    )
+                }
+
+                // Diagnostics Screen
+                composable("diagnostics") {
+                    DiagnosticsScreen(
+                        diagnostics = diagnostics,
+                        onTriggerIncrementalIndex = { viewModel.triggerIncrementalIndex() },
+                        onTriggerRebuildIndex = { viewModel.triggerRebuildIndex() },
+                        onClearIndex = { viewModel.clearIndexAndCache() },
+                        onClearAllRemembered = { viewModel.clearAllRememberedData() },
+                        onBackClick = { navController.popBackStack() }
                     )
                 }
 
@@ -307,6 +366,8 @@ fun FindAnythingMainApp(viewModel: SearchViewModel) {
                     SettingsScreen(
                         onNavigatePermissions = { navController.navigate("permissions") },
                         onNavigatePrivacy = { navController.navigate("privacy") },
+                        onNavigatePeople = { navController.navigate("people") },
+                        onNavigateDiagnostics = { navController.navigate("diagnostics") },
                         onBackClick = { navController.popBackStack() }
                     )
                 }

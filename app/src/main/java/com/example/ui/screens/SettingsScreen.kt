@@ -17,8 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
@@ -46,6 +48,8 @@ import androidx.compose.ui.unit.sp
 fun SettingsScreen(
     onNavigatePermissions: () -> Unit,
     onNavigatePrivacy: () -> Unit,
+    onNavigatePeople: () -> Unit = {},
+    onNavigateDiagnostics: () -> Unit = {},
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -86,6 +90,40 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+            // Memory & Diagnostics
+            item {
+                Text(
+                    text = "Memory & Assistant Engine",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
+            }
+
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        SettingsNavRow(
+                            title = "Remembered Entities & People",
+                            subtitle = "Teach Rahul, Ammi, pet, bike reference photos",
+                            icon = Icons.Default.Face,
+                            onClick = onNavigatePeople
+                        )
+                        SettingsNavRow(
+                            title = "Index & Diagnostics",
+                            subtitle = "Status, database counts, and rebuild controls",
+                            icon = Icons.Default.Refresh,
+                            onClick = onNavigateDiagnostics
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+            }
+
             // Search Engine Preferences
             item {
                 Text(

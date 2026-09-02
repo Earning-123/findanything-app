@@ -11,10 +11,16 @@ import org.junit.Test
 class IntentEngineTest {
 
     @Test
-    fun parse_hinglishPhotoQuery_returnsSearchPhoto() {
+    fun parse_hinglishPhotoQuery_returnsSearchEntity() {
         val result = IntentEngine.parse("Rahul ki photos dikhao")
+        assertEquals(IntentType.SEARCH_ENTITY, result.intentType)
+        assertEquals("rahul", result.targetPerson?.lowercase())
+    }
+
+    @Test
+    fun parse_genericPhotoQuery_returnsSearchPhoto() {
+        val result = IntentEngine.parse("Camera photos dikhao")
         assertEquals(IntentType.SEARCH_PHOTO, result.intentType)
-        assertTrue(result.searchTerms.contains("rahul") || result.targetPerson?.contains("rahul") == true)
     }
 
     @Test

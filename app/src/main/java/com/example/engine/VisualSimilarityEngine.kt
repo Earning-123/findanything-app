@@ -72,8 +72,21 @@ class VisualSimilarityEngine(private val context: Context) {
         return dist
     }
 
-    suspend fun findSimilarPhotos(referenceHash: Long, photoCandidates: List<SearchItem>, maxDistance: Int = 10): List<SearchItem> = withContext(Dispatchers.Default) {
-        if (referenceHash == 0L) return@withContext emptyList()
+    suspend fun findSimilarPhotos(
+        referenceHash: Long,
+        photoCandidates: List<SearchItem>,
+        maxDistance: Int = 12
+    ): List<SearchItem> {
+        return findSimilarPhotosMultiRef(listOf(referenceHash), photoCandidates, maxDistance)
+    }
+
+    suspend fun findSimilarPhotosMultiRef(
+        referenceHashes: List<Long>,
+        photoCandidates: List<SearchItem>,
+        maxDistance: Int = 12
+    ): List<SearchItem> = withContext(Dispatchers.Default) {
+        val validRefHashes = referenceHashes.filter { it != 0L }
+        if (validRefHashes.isEmpty()) return@withContext emptyList()
         val scored = mutableListOf<Pair<SearchItem, Int>>()
 
         for (photo in photoCandidates) {
@@ -81,11 +94,19 @@ class VisualSimilarityEngine(private val context: Context) {
                 photo.uri?.let { computeImageHash(it) } ?: 0L
             }
             if (hash != 0L) {
-                val dist = hammingDistance(referenceHash, hash)
-                if (dist <= maxDistance) {
-                    val similarityPercent = ((64 - dist) * 100) / 64
-                    val matchReason = "Visual Match ($similarityPercent% similar)"
-                    scored.add(photo.copy(visualHash = hash, matchReason = matchReason) to dist)
+                // Find minimum hamming distance across all reference images of the entity
+                var minDist = 64
+                for (refHash in validRefHashes) {
+                    val d = hammingDistance(refHash, hash)
+                    if (d < minDist) {
+                        minDist = d
+                    }
+                }
+
+                if (minDist <= maxDistance) {
+                    val similarityPercent = ((64 - minDist) * 100) / 64
+                    val matchReason = "Possible match ($similarityPercent% similar)"
+                    scored.add(photo.copy(visualHash = hash, matchReason = matchReason) to minDist)
                 }
             }
         }

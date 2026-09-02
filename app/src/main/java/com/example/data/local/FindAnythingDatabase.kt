@@ -7,11 +7,22 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [
-        IndexedItemEntity::class,
+        MediaItemEntity::class,
+        FileItemEntity::class,
+        OcrTextEntity::class,
+        VisualFeatureEntity::class,
+        LabelEntity::class,
+        ReferenceImageEntity::class,
+        LabelMediaAssociationEntity::class,
+        ConfirmedMatchEntity::class,
+        DuplicateGroupEntity::class,
+        IndexStatusEntity::class,
+        UserSettingsEntity::class,
         SearchHistoryEntity::class,
+        IndexedItemEntity::class,
         OcrCacheEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class FindAnythingDatabase : RoomDatabase() {
@@ -34,3 +45,4 @@ abstract class FindAnythingDatabase : RoomDatabase() {
         }
     }
 }
+

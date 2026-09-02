@@ -22,6 +22,7 @@ enum class IntentType {
     SEARCH_DUPLICATES,
     SEARCH_LARGE_FILES,
     SEARCH_OCR,
+    SEARCH_ENTITY, // For tagged people / entities e.g. Rahul, Ammi
     OPEN_ITEM,
     SHARE_ITEM,
     DELETE_ITEM,
@@ -44,7 +45,11 @@ data class SearchItem(
     val matchReason: String = "",
     val ocrText: String? = null,
     val visualHash: Long = 0L,
-    val isScreenshot: Boolean = false
+    val isScreenshot: Boolean = false,
+    val labelBadge: String? = null, // "User Tagged", "Confirmed Match", "Possible Match"
+    val isConfirmed: Boolean = false,
+    val isPossibleMatch: Boolean = false,
+    val associatedLabelId: Long? = null
 ) {
     val formattedSize: String
         get() = when {
@@ -71,6 +76,8 @@ data class ParsedIntent(
     val targetAmount: String? = null,
     val targetFileType: String? = null,
     val targetDateFilter: DateFilter? = null,
+    val targetYear: Int? = null,
+    val targetAction: String? = null, // "OPEN_LATEST", "SHARE", "DELETE", "FIND_SIMILAR"
     val isScreenshotTargeted: Boolean = false,
     val minSizeBytes: Long? = null,
     val explanation: String = ""
@@ -81,7 +88,8 @@ enum class DateFilterType {
     YESTERDAY,
     LAST_WEEK,
     LAST_MONTH,
-    SPECIFIC_MONTH
+    SPECIFIC_MONTH,
+    SPECIFIC_YEAR
 }
 
 data class DateFilter(
@@ -97,3 +105,4 @@ data class DuplicateCluster(
     val duplicates: List<SearchItem>,
     val totalReclaimableBytes: Long
 )
+

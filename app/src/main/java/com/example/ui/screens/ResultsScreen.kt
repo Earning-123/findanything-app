@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
@@ -87,6 +88,8 @@ fun ResultsScreen(
     onOpenItem: (SearchItem) -> Unit,
     onShareItem: (SearchItem) -> Unit,
     onDeleteItem: (SearchItem) -> Unit,
+    onConfirmMatch: ((String) -> Unit)? = null,
+    onRejectMatch: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var selectedItemForInfo by remember { mutableStateOf<SearchItem?>(null) }
@@ -293,7 +296,9 @@ fun ResultsScreen(
                                 onClick = { onOpenItem(item) },
                                 onShare = { onShareItem(item) },
                                 onDelete = { selectedItemForDelete = item },
-                                onInfo = { selectedItemForInfo = item }
+                                onInfo = { selectedItemForInfo = item },
+                                onConfirmMatch = onConfirmMatch,
+                                onRejectMatch = onRejectMatch
                             )
                         }
                         else -> {
@@ -338,7 +343,9 @@ fun PhotoResultCard(
     onClick: () -> Unit,
     onShare: () -> Unit,
     onDelete: () -> Unit,
-    onInfo: () -> Unit
+    onInfo: () -> Unit,
+    onConfirmMatch: ((String) -> Unit)? = null,
+    onRejectMatch: ((String) -> Unit)? = null
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -364,7 +371,45 @@ fun PhotoResultCard(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                if (item.isScreenshot) {
+                if (item.labelBadge != null) {
+                    Surface(
+                        color = when {
+                            item.isConfirmed -> MaterialTheme.colorScheme.primary
+                            item.isPossibleMatch -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.secondary
+                        },
+                        shape = RoundedCornerShape(bottomEnd = 10.dp),
+                        modifier = Modifier.align(Alignment.TopStart)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                        ) {
+                            if (item.isConfirmed) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                            }
+                            Text(
+                                text = item.labelBadge,
+                                color = when {
+                                    item.isConfirmed -> MaterialTheme.colorScheme.onPrimary
+                                    item.isPossibleMatch -> MaterialTheme.colorScheme.onTertiary
+                                    else -> MaterialTheme.colorScheme.onSecondary
+                                },
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 9.sp,
+                                    letterSpacing = 0.4.sp
+                                )
+                            )
+                        }
+                    }
+                } else if (item.isScreenshot) {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                         shape = RoundedCornerShape(bottomEnd = 10.dp),
@@ -417,6 +462,50 @@ fun PhotoResultCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                if (item.isPossibleMatch && onConfirmMatch != null && onRejectMatch != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Confirm match?",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            IconButton(
+                                onClick = { onConfirmMatch(item.id) },
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                            ) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Confirm",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = { onRejectMatch(item.id) },
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(MaterialTheme.colorScheme.errorContainer, CircleShape)
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = "Reject",
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier
